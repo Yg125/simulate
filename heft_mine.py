@@ -1,6 +1,6 @@
 # 仿照HEFT算法将其应用在我的场景中
 import numpy as np
-from Configure import NUM_AGENTS, B_aver, B_c, B_e, B_u, NUM_TASKS
+from Configure import NUM_AGENTS, B_aver, B_c, B_e, B_u
 from Env import Server, Remote_cloud, server_capacity, comp
 
 servers = [Server(i, comp[i], server_capacity[i]) for i in range(NUM_AGENTS)]
@@ -135,7 +135,7 @@ class HEFT:
                 t.duration['start'] = 0
                 t.duration['end'] = w
                 self.processors[p].task_list.append(t)
-            elif t.id == NUM_TASKS + 1:
+            elif t.id == self.num_tasks - 1:
                 tar_p = self.tasks[0].processor_id
                 tar_est = self.__get_est(t, self.processors[tar_p])
                 t.processor_id = tar_p
@@ -181,6 +181,6 @@ class HEFT:
 if __name__ == "__main__":
     from argparse import ArgumentParser
     ap = ArgumentParser()
-    DAGS = np.load('dag_info_6.npy', allow_pickle=True)
-    new_sch = HEFT(6, DAGS[6][0:3], verbose=True)
+    DAGS = np.load('./dag_infos/dag_info_random_es5.npy', allow_pickle=True)
+    new_sch = HEFT(0, DAGS[0][0:3], verbose=True)
     print(new_sch)

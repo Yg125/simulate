@@ -5,7 +5,7 @@ from itertools import product
 
 minalpha = 20
 maxalpha = 50
-n = 6
+n = 19
 fat = 0.5
 density = 0.5
 regularity = 0.5
@@ -15,7 +15,8 @@ keys = ['n', 'fat', 'density', 'regularity', 'jump']
 values = [n, fat, density, regularity, jump]
 for i in range(10):
     param = dict(zip(keys, values))
-    filename = 'dags/sim_' + str(i) + '.dot'
+    system(f"mkdir -p dags_dot_{n}")
+    filename = f'dags_dot_{n}/sim_' + str(i) + '.dot'
     param = dict(zip(keys, values))
     system("daggen-master/daggen -n {} --fat {} --density {} --regular {} --jump {} --minalpha {} --maxalpha {} --dot -o {}".format(
         param['n'],

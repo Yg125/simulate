@@ -78,18 +78,30 @@ def generate_dag(filename, ccr=0.5):
 
     return [n_nodes, comp_matrix, adj_matrix]
 
+task_numbers = np.array([ 6,  8,  4,  7,  9,  3,  5,  4,  3,  6,  3,  7,  3,  6,  3,  5,  4,
+        6,  3,  4,  6, 10,  4,  4,  5,  4,  3,  4,  3,  5,  5,  5,  7,  17,
+        8,  5,  5,  3, 10,  4,  13,  4,  8, 6, 14,  6,  6,  6,  9,  8,  5,
+        5,  4,  6,  3,  6,  9,  7,  3,  6,  3, 12,  3,  4, 12,  8,  4,  16,
+        5,  3,  6,  8,  9,  7,  3, 11,  6,  4,  3,  6,  4, 15,  7,  3,  5,
+        3,  6,  4,  3,  4,  7,  5,  3,  6,  6,  3, 17,  7, 10,  8,  7,  4,
+       10,  3,  5,  6,  6,  9,  6,  8,  8,  4,  5,  3, 10,  3,  4,  4,  3,
+        4,  4,  4,  8,  9,  5,  4, 11,  6,  8,  6,  9,  5,  3,  8,  6,  4,
+        5,  7,  3,  7,  5,  3,  6,  18,  7,  5,  4,  3,  6,  5,  3,  8,  3,
+       10,  4,  3,  6,  4,  4,  6,  5,  19,  4,  5,  7,  5,  4,  7,  5,  3,
+       14,  3,  4, 12,  6,  6,  4,  7,  8,  4,  3,  6,  7,  6,  3,  6,  6,
+        7, 11,  3, 12,  8,  20,  4,  4,  4,  4,  3,  5,  6])
 
 if __name__ == "__main__":
     results = []
     for i in range(200):
         # result = generate_dag('dags/sim_0.dot')
-        files = os.listdir(f'dags_dot_{NUM_TASKS}')
+        files = os.listdir(f'dags/dags_dot_{task_numbers[i]}')
         file = np.random.choice(files)
-        result = generate_dag(os.path.join(f'dags_dot_{NUM_TASKS}', file))
+        result = generate_dag(os.path.join(f'dags/dags_dot_{task_numbers[i]}', file))
         makespan = HEFT(i, result).makespan
         result.append(makespan)
         results.append(result)
-    np.save(f'./dag_infos/dag_info_{NUM_TASKS}_es{NUM_AGENTS}.npy', results)
+    np.save(f'./dag_infos/dag_info_random_es{NUM_AGENTS}.npy', results)
             
         
     # n_nodes, comp_matrix, adj_matrix = generate_dag('test2.dot')
