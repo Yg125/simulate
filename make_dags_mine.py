@@ -5,7 +5,7 @@ from itertools import product
 
 minalpha = 20
 maxalpha = 50
-n = 20
+n = 6
 fat = 0.5
 density = 0.5
 regularity = 0.5

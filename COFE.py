@@ -119,12 +119,17 @@ class COFE:
         # k_id_list = [(item.k, item.id) for item in self.ready_tasks]
         # print(k_id_list)
         for t in self.ready_tasks:
-            p, est = self.get_tar(t)
+            result = self.get_tar(t)
+            if isinstance(result, tuple) and len(result) == 3:
+                p, est, vm = result
+                processors[p].vms[vm].task_list.append(t)
+            else:
+                p, est = result
+                processors[p].task_list.append(t)
             t.processor_id = p
             t.duration['start'] = est
             t.duration['end'] = t.duration['start'] + self.dags[t.k].comp_cost[t.id][p]
-            queues[t.k].remove(t)
-            processors[p].task_list.append(t)
+            queues[t.k].remove(t)       
             self.complete_task.append(t)
         self.complete_task.sort(key=lambda x: x.duration['end'])
         self.ready_tasks.clear()
@@ -139,8 +144,19 @@ class COFE:
                     est = max(est, pre.duration['end'] + round(c*B_e/10**6, 1))  # ms
                 else:
                     est = max(est, pre.duration['end'] + round(c*B_c/10**6, 1))
-        if p.id == 5 or len(p.task_list) == 0:  # 在云或者之前没有任务则直接返回任务依赖的EST
+        if p.id in range(5) and len(p.task_list) == 0:  # 在之前没有任务则直接返回任务依赖的EST
             return est
+        elif p.id == 5:
+            est_cloud = float('inf')
+            vm_i = None 
+            for i in range(len(cloud.vms)):
+                if len(cloud.vms[i].task_list) == 0:
+                    return (est, i)
+                else:
+                    if est_cloud > cloud.vms[i].task_list[-1].duration['end']:
+                        est_cloud = cloud.vms[i].task_list[-1].duration['end']
+                        vm_i = i
+            return (max(est, est_cloud), vm_i)
         else:
             avail = p.task_list[-1].duration['end'] # 否则需要返回当前processor任务list里最后一个任务的完成时间
             return max(est, avail)
@@ -151,21 +167,29 @@ class COFE:
         if t.id == 0: 
             tar_p = request_list[t.k]         # 随机从某个边缘服务器发出请求
             tar_est = self.get_est(t, processors[tar_p], t.k)
-            return [tar_p, tar_est]
+            return (tar_p, tar_est)
         elif t.id == self.dags[t.k].tasks[-1].id:
             tar_p = self.dags[t.k].tasks[0].processor_id
             tar_est = self.get_est(t, processors[tar_p], t.k)
-            return [tar_p, tar_est]
+            return (tar_p, tar_est)
         else:
             aft = float("inf")
             for processor in processors:
-                est = self.get_est(t, processor, t.k)
+                # est = self.get_est(t, processor, t.k)
+                result = self.get_est(t, processor, t.k)
+                if isinstance(result, tuple):
+                    est, vm_i = result
+                else:
+                    est = result
                 eft = est + self.dags[t.k].comp_cost[t.id][processor.id]
                 if eft < aft:   # found better case of processor
                     aft = eft
                     tar_p = processor.id
                     tar_est = est
-            return [tar_p, tar_est]
+            if tar_p == 5:
+                return (tar_p, tar_est, vm_i)
+            else:
+                return (tar_p, tar_est)
         
     def str(self):
         print_str = ""

@@ -14,7 +14,7 @@ for processor in processors:        # 由于processors信息在environment.py中
 class COFE_plus:
     def __init__(self):
         global Q, queues, processors      
-        self.num_processors = 6
+        self.num_processors = 4
         self.dags = []
         self.arrive_list = []
         self.ready_tasks = []
@@ -132,11 +132,11 @@ class COFE_plus:
         for pre in self.dags[k].tasks:
             if self.dags[k].graph[pre.id][t.id] != -1:  # if pre also done on p, no communication cost
                 c = self.dags[k].graph[pre.id][t.id] if pre.processor_id != p.id else 0
-                if pre.processor_id in range(5) and p.id in range(5): 
+                if pre.processor_id in range(3) and p.id in range(3): 
                     est = max(est, pre.duration['end'] + round(c*B_e/10**6, 1))  # ms
                 else:
                     est = max(est, pre.duration['end'] + round(c*B_c/10**6, 1))
-        if p.id == 5 or len(p.task_list) == 0:  # 在云或者之前没有任务则直接返回任务依赖的EST
+        if p.id == 3 or len(p.task_list) == 0:  # 在云或者之前没有任务则直接返回任务依赖的EST
             return est
         else:
             avail = p.task_list[-1].duration['end'] # 否则需要返回当前processor任务list里最后一个任务的完成时间

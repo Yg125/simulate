@@ -2,14 +2,17 @@
 import pydot
 import numpy as np
 from random import gauss
-from environment import B_aver, servers, cloud
+from Configure import B_aver, NUM_AGENTS, NUM_TASKS
+from Env import Server, Remote_cloud, server_capacity, comp
 from os import system
 from heft_mine import HEFT
 import os 
 np.random.seed(1)
 
+servers = [Server(i, comp[i], server_capacity[i]) for i in range(NUM_AGENTS)]
+cloud = Remote_cloud(NUM_AGENTS, 7000)
 
-def generate_dag(filename, ccr=0.4):
+def generate_dag(filename, ccr=0.5):
     graph = pydot.graph_from_dot_file(filename)[0]
     n_nodes = len(graph.get_nodes())
 
@@ -39,7 +42,7 @@ def generate_dag(filename, ccr=0.4):
     n_nodes = len(graph.get_nodes())
 
     # construct computation matrix
-    comp_matrix = np.empty((n_nodes, 6))
+    comp_matrix = np.empty((n_nodes, NUM_AGENTS+1))
     comp_total = 0
     for n in graph.get_node_list():
         size_str = n.obj_dict['attributes']['alpha']
@@ -48,9 +51,9 @@ def generate_dag(filename, ccr=0.4):
             comp_matrix[int(n.get_name())][:] = 0
         else:
             # mi = np.random.randint(low=100, high=500)   # MI per task
-            mi = abs(np.random.normal(0.01,0.025)) * 10**4     # MI per task
+            mi = abs(np.random.uniform(0.015,0.02)) * 10**4     # MI per task
             comp_temp = []
-            for i in range(5):
+            for i in range(NUM_AGENTS):
                 comp_temp.append(round(mi / servers[i].comp * 1000, 1))   # calculate time  ms
             comp_temp.append(round(mi / cloud.comp * 1000, 1))
             comp_matrix[int(n.get_name())][:] = comp_temp
@@ -71,7 +74,7 @@ def generate_dag(filename, ccr=0.4):
             adj_matrix[source][dest] = data_in * 2**20               # Byte
         else:
             # adj_matrix[source][dest] = round(abs(gauss(mu, mu/4))*B_aver/10**6, 1)   # communication time  ms
-            adj_matrix[source][dest] = abs(gauss(mu, mu/4))
+            adj_matrix[source][dest] = abs(gauss(mu, mu/100))
 
     return [n_nodes, comp_matrix, adj_matrix]
 
@@ -80,15 +83,13 @@ if __name__ == "__main__":
     results = []
     for i in range(200):
         # result = generate_dag('dags/sim_0.dot')
-        files = os.listdir('dags_dot')
+        files = os.listdir(f'dags_dot_{NUM_TASKS}')
         file = np.random.choice(files)
-        result = generate_dag(os.path.join('dags_dot', file))
+        result = generate_dag(os.path.join(f'dags_dot_{NUM_TASKS}', file))
         makespan = HEFT(i, result).makespan
         result.append(makespan)
         results.append(result)
-    np.save(f'dag_info.npy', results)
-    
-    
+    np.save(f'./dag_infos/dag_info_{NUM_TASKS}_es{NUM_AGENTS}.npy', results)
             
         
     # n_nodes, comp_matrix, adj_matrix = generate_dag('test2.dot')
