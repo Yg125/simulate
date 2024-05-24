@@ -2,7 +2,7 @@
 import pydot
 import numpy as np
 from random import gauss
-from Configure import B_aver, NUM_AGENTS, NUM_TASKS
+from Configure import B_aver, NUM_AGENTS
 from Env import Server, Remote_cloud, server_capacity, comp
 from os import system
 from heft_mine import HEFT

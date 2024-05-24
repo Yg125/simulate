@@ -1,6 +1,6 @@
 import random
 from matplotlib import pyplot as plt
-from Configure import DAG, Args, Task, B_u, B_aver, B_c, B_e, TIME_STAMP, eta_vio, eta, w_3, NUM_TASKS, Lambda, Q
+from Configure import DAG, Args, Task, B_u, B_aver, B_c, B_e, TIME_STAMP, eta_vio, eta, w_3, Lambda, Q
 from collections import deque
 import numpy as np
 from Env import ScheduleEnv, Server, Remote_cloud, server_capacity, comp, task_type, request_list3, request_list5, interval_dict
@@ -32,8 +32,8 @@ class OnDoc_plus:
         self.virtual_time = 0.0        # 定义在线场景的虚拟时间，避免受机器运行时间干扰
         self.complete_task = []        # COFE算法中记录每个子任务的完成时间
         self.args = args
-        self.graph = np.empty((self.Q, NUM_TASKS + 2, NUM_TASKS + 2))
-        self.comp_cost = np.empty((self.Q, NUM_TASKS + 2, self.n_agents + 1))
+        self.graph = [0 for _ in range(self.Q)]
+        self.comp_cost = [0 for _ in range(self.Q)]
         self.tasks = [0 for _ in range(self.Q)]
         self.processors = self.servers + [self.cloud]     # servers编号为0-4, cloud编号为5
         self.device = args.device
@@ -44,7 +44,8 @@ class OnDoc_plus:
     def receive_dag(self):                    # k is the index of the request/queue from 0
         virtual_time = 0
         tasks = [0 for _ in range(self.Q)]
-        DAGS = np.load(f'./dag_infos/dag_info_{NUM_TASKS}_es{self.n_agents}.npy', allow_pickle=True)  # Read DAG from file
+        DAGS = np.load(f'./dag_infos/dag_info_random_es{self.n_agents}.npy', allow_pickle=True)  # Read DAG from file
+        type_count = 0
         for k in range(self.Q):
             self.dags[k] = DAG(k)
             self.dags[k].num_tasks, self.comp_cost[k], self.graph[k], deadline_heft = DAGS[k]   
@@ -52,7 +53,8 @@ class OnDoc_plus:
             self.dags[k].r = virtual_time    # ms
             self.arrive_list[k] = virtual_time
             num_tasks = self.dags[k].num_tasks
-            tasks[k] = [Task(i,k,self.task_type[k*(NUM_TASKS+2)+i]) for i in range(num_tasks)]
+            tasks[k] = [Task(i,k,self.task_type[type_count+i]) for i in range(num_tasks)]
+            type_count += num_tasks
             data_in = 0
             for j in range(self.dags[k].num_tasks):
                 tasks[k][j].avg_comp = sum(self.comp_cost[k][j]) / self.num_processors
@@ -148,7 +150,7 @@ class OnDoc_plus:
             self.processors[p].task_list.append(task)
         else:
             self.cloud.vms[vm].task_list.append(task)
-        if task.id != NUM_TASKS + 1:
+        if task.id != self.dags[task.k].num_tasks - 1:
             self.complete_task.append(task)
 
         self.complete_task.sort(key=lambda x: x.end)
@@ -158,7 +160,7 @@ class OnDoc_plus:
             print('DAG:{} Task {} is not in ready_tasks'.format(task.k,task.id))
    
     def get_est(self, t, p, k): 
-        if (p.id in range(self.n_agents) and not p.service_list[t.service_id]) and (t.id != 0 and t.id != NUM_TASKS + 1):
+        if (p.id in range(self.n_agents) and not p.service_list[t.service_id]) and (t.id != 0 and t.id != self.dags[t.k].num_tasks - 1):
             return float('inf')
         if p.id in range(self.n_agents):
             est = max(self.dags[k].r + self.dags[k].t_offload, self.virtual_time, (self.virtual_time//self.TIME_STAMP)*self.TIME_STAMP + p.service_migrate[t.service_id]*self.configuring_time)    # 初始化est时间为任务到达时间和offload时间之和
@@ -247,7 +249,7 @@ def stack_array(x):
     # rearranged = [[sub_x[i] for sub_x in x] for i in range(len(x[0]))]
     return [torch.FloatTensor(np.vstack(aa)).to(device) for aa in rearranged]
 
-num_episodes = 30000
+num_episodes = 10000
 buffer_size = 1000000
 hidden_dim = 64
 actor_lr = 1e-3
@@ -398,7 +400,7 @@ def evaluate(maddpg, env, ondoc_plus):
         #         episode_reward += 1
         #     else:
         #         episode_reward -= 1
-        if task.id == NUM_TASKS + 1:
+        if task.id == ondoc_plus.dags[task.k].num_tasks - 1:
             if task.end > ondoc_plus.dags[task.k].deadline:
                 episode_reward += -ondoc_plus.eta_vio * ondoc_plus.w_3
             # else:
@@ -560,20 +562,20 @@ while i_episode < num_episodes:
             next_state[task.processor_id][5+task.service_id] = 1
         if task.processor_id in range(env.agents):
             next_state[task.processor_id][11] = task.end // ondoc_plus.TIME_STAMP
-            if task.id in range(NUM_TASKS + 1):
+            if task.id in range(ondoc_plus.dags[task.k].num_tasks - 1):
                 if task.lt >= tar_est:
                     reward[task.processor_id] += 1
                 else:
                     reward[task.processor_id] -= 1
         else:
-            if task.id in range(NUM_TASKS + 1):
+            if task.id in range(ondoc_plus.dags[task.k].num_tasks - 1):
                 if task.lt >= tar_est:
                     for i in range(env.agents):
                         reward[i] += 1/env.agents
                 else:
                     for i in range(env.agents):
                         reward[i] += -1/env.agents
-        if task.id == NUM_TASKS + 1:
+        if task.id == ondoc_plus.dags[task.k].num_tasks - 1:
             if task.end > ondoc_plus.dags[task.k].deadline:
                 for i in range(env.agents):
                     reward[i] += -ondoc_plus.eta_vio * ondoc_plus.w_3 * 1/env.agents
@@ -618,12 +620,12 @@ while i_episode < num_episodes:
 plt.plot(range(len(return_list)), return_list)
 plt.xlabel('Episodes')
 plt.ylabel('Episode reward')
-result = f'nodecay_clr-{critic_lr}_alr-{actor_lr}_grad-10_q-{Q}_Agents-{ondoc_plus.n_agents}_Lambda-{Lambda}_Tasks-{NUM_TASKS}_buffer-{buffer_size}_hidden-{hidden_dim}.png'
+result = f'nodecay_clr-{critic_lr}_alr-{actor_lr}_grad-10_q-{Q}_Agents-{ondoc_plus.n_agents}_Lambda-{Lambda}_buffer-{buffer_size}_hidden-{hidden_dim}.png'
 plt.savefig(args.result_dir + result, format='png')
 
 my_return = rl_utils.moving_average(return_list, 9)
 plt.plot(range(len(return_list)), my_return)
 plt.xlabel('Episodes')
 plt.ylabel('Episode reward')
-result = f'nodecay_clr-{critic_lr}_alr-{actor_lr}_grad-10_q-{Q}_Agents-{ondoc_plus.n_agents}_Lambda-{Lambda}_Tasks-{NUM_TASKS}_buffer-{buffer_size}_hidden-{hidden_dim}_rl.png'
+result = f'nodecay_clr-{critic_lr}_alr-{actor_lr}_grad-10_q-{Q}_Agents-{ondoc_plus.n_agents}_Lambda-{Lambda}_buffer-{buffer_size}_hidden-{hidden_dim}_rl.png'
 plt.savefig(args.result_dir + result, format='png')

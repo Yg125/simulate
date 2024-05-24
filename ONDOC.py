@@ -1,4 +1,4 @@
-from Configure import Task, DAG, NUM_AGENTS, mu_c, Gamma, w_1, w_2, w_3, eta_vio, B_u, B_e, B_c, B_aver, NUM_TASKS, Lambda, Q
+from Configure import Task, DAG, NUM_AGENTS, mu_c, Gamma, w_1, w_2, w_3, eta_vio, B_u, B_e, B_c, B_aver, Lambda, Q
 from Env import Server, Remote_cloud, server_capacity, service_size, comp, request_list3, request_list5, interval_dict, task_type
 from collections import deque
 import numpy as np
@@ -22,8 +22,8 @@ class OnDoc:
         self.arrive_list = [0 for _ in range(self.Q)]
         self.virtual_time = 0.0 
         self.processors = self.servers + [self.cloud]
-        self.graph = np.empty((self.Q, NUM_TASKS + 2, NUM_TASKS + 2))
-        self.comp_cost = np.empty((self.Q, NUM_TASKS + 2, NUM_AGENTS+1))
+        self.graph = [0 for _ in range(self.Q)]
+        self.comp_cost = [0 for _ in range(self.Q)]
         self.tasks = [0 for _ in range(self.Q)]
         self.reward = 0
         self.request_list = request_list3 if NUM_AGENTS == 3 else request_list5
@@ -48,7 +48,8 @@ class OnDoc:
     def receive_dag(self):                    # k is the index of the request/queue from 0
         virtual_time = 0
         tasks = [0 for _ in range(self.Q)]
-        DAGS = np.load(f'./dag_infos/dag_info_{NUM_TASKS}_es{NUM_AGENTS}.npy', allow_pickle=True)  # Read DAG from file
+        DAGS = np.load(f'./dag_infos/dag_info_random_es5.npy', allow_pickle=True)  # Read DAG from file
+        type_count = 0
         for k in range(self.Q):
             self.dags[k] = DAG(k)
             self.dags[k].num_tasks, self.comp_cost[k], self.graph[k], deadline_heft = DAGS[k]   
@@ -56,7 +57,8 @@ class OnDoc:
             self.dags[k].r = virtual_time    # ms
             self.arrive_list[k] = virtual_time
             num_tasks = self.dags[k].num_tasks
-            tasks[k] = [Task(i,k,self.task_type[k*(NUM_TASKS + 2)+i]) for i in range(num_tasks)]
+            tasks[k] = [Task(i,k,self.task_type[type_count+i]) for i in range(num_tasks)]
+            type_count += num_tasks
             data_in = 0
             for j in range(self.dags[k].num_tasks):
                 tasks[k][j].avg_comp = sum(self.comp_cost[k][j]) / self.num_processors
@@ -104,7 +106,7 @@ class OnDoc:
                 index += 1
             task = self.queues[min_k][0]
             if tar_p in range(NUM_AGENTS):
-                if (task.service_id not in self.processors[tar_p].service_list) and (task.id != 0 and task.id != NUM_TASKS + 1):   
+                if (task.service_id not in self.processors[tar_p].service_list) and (task.id != 0 and task.id != self.dags[task.k].num_tasks - 1):   
                     if sum(self.processors[tar_p].service_list) == 3:
                         replace = self.processors[tar_p].service_end.index(min(self.processors[tar_p].service_end))
                         self.reward += -Gamma * service_size[task.service_id] * w_1 * (self.processors[tar_p].service_end[replace] - self.processors[tar_p].service_start[replace])/1000
@@ -158,7 +160,7 @@ class OnDoc:
             self.processors[NUM_AGENTS].vms[vm].task_list.append(task)
          
     def get_est(self, t, p, k): 
-        if (p.id in range(NUM_AGENTS) and not p.service_list[t.service_id]) and (t.id != 0 and t.id != NUM_TASKS + 1):
+        if (p.id in range(NUM_AGENTS) and not p.service_list[t.service_id]) and (t.id != 0 and t.id != self.dags[t.k].num_tasks - 1):
             if sum(p.service_list) < 3:
                 est = max(self.dags[k].r + self.dags[k].t_offload, self.virtual_time + configuring_time)
             else:
@@ -246,4 +248,4 @@ ondoc.receive_dag()
 ondoc.schedule()
 
 str = ondoc.str()
-print(f"Q={ondoc.Q} ES={NUM_AGENTS} NUM={NUM_TASKS} lambda=3 SR={str}% Reward={ondoc.reward}")
+print(f"Q={ondoc.Q} ES={NUM_AGENTS} lambda=3 SR={str}% Reward={ondoc.reward}")
